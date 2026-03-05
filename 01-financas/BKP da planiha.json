@@ -1,0 +1,117 @@
+{
+  "name": "BKP da planiha",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "months",
+              "triggerAtHour": 9,
+              "triggerAtMinute": 5
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f955d5b2-f98a-404f-ad05-ca569fa89bcc",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "mode": "list",
+          "cachedResultName": "xxxxx",
+          "cachedResultUrl": "xxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "5bf08cf7-aa79-4ed6-8db7-ce4b4cfb8545",
+      "name": "Download file",
+      "credentials": {
+        "googleApi": {
+          "id": "QyYewb56rWdgdpNV",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "-xxxxxxxxx",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=Segue cópia de segurança do Controle Financeiro. Data: {{ $now.format('dd/MM/yyyy') }}\""
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "ff6f6bff-9b8d-4634-ac35-8fc124614aa9",
+      "name": "Send a document",
+      "webhookId": "e7ca0931-9b41-4d4a-97d6-501b7841ea66",
+      "credentials": {
+        "telegramApi": {
+          "id": "OjGmSM4i9zZjVsrh",
+          "name": "Telegram account 2"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Send a document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f99e0b26-3ccc-4115-b3cf-68a1a08a7c29",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "83839adb748f869997470f1de0d699fd72ac28a9f2e75218f6149692798f93be"
+  },
+  "id": "sADIiMbAritOu4YW",
+  "tags": []
+}

@@ -1,0 +1,215 @@
+{
+  "name": "Heart Check",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1,
+                3,
+                5
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -480,
+        0
+      ],
+      "id": "e4e81c97-f6bd-4c6b-a241-e228665c61b3",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "xxxxxxxxxxxxxxxxxxx",
+          "mode": "list",
+          "cachedResultName": "xxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "cachedResultUrl": "xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1844663475,
+          "mode": "list",
+          "cachedResultName": "xxxxxxxxxxxxxxx",
+          "cachedResultUrl": "xxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "BUSCA",
+              "lookupValue": "MONITOR"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        -304,
+        0
+      ],
+      "id": "e4868bc5-3495-4050-880e-31659b9e5c00",
+      "name": "Get row(s) in sheet",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleApi": {
+          "id": "QyYewb56rWdgdpNV",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Você é um consultor financeiro pessoal.\nHoje é dia de Health Check! 🏥\n\nAnalise os dados brutos da planilha:\n\n1. 💰 Total Entradas: R$ {{ $('Get row(s) in sheet').first().json.Total_Entradas }}\n2. 💸 Total Gastos: R$ {{ $('Get row(s) in sheet').first().json.Total_Gastos }}\n3. 🚦 Status do Farol: {{ $('Get row(s) in sheet').first().json.Status_Farol }}\n\nMissão:\n- Compare Entradas vs Saídas.\n- Se o Farol (Status) indicar perigo, dê um alerta.\n- Se estiver tudo zerado, avise que falta lançar a renda ou os gastos.\n- Seja breve.\n\nIMPORTANTE: Use formatação HTML para o Telegram. Use a tag <b> para negrito (ex: <b>Texto</b>).\n\nFINAL OBRIGATÓRIO:\n🔒 <b>Auditoria:</b> Abra o app do banco e confira se o saldo bate!",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        64,
+        0
+      ],
+      "id": "76529d0f-3eb8-4511-88f3-4ce24f93b0d7",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "chatId": "xxxxxxxxxx",
+        "text": "={{ $json.output.replace(/\\*\\*(.*?)\\*\\*/g, '<b>$1</b>') }}\n",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "23b7df57-29c6-40ae-ad96-bf6cb60a9c80",
+      "name": "Send a text message",
+      "webhookId": "d4253ba0-121a-4e90-993a-b567db5f8a80",
+      "credentials": {
+        "telegramApi": {
+          "id": "OjGmSM4i9zZjVsrh",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        -112,
+        0
+      ],
+      "id": "3b31019b-d337-4dd0-8c9b-b14488188119",
+      "name": "Limit"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        64,
+        176
+      ],
+      "id": "16b1f372-d996-4d62-84ea-3de8cf9a9297",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "NXvjA6OExOgZMV56",
+          "name": "Groq account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f60f6662-f3de-49e7-a5ae-05c5a0685e62",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "83839adb748f869997470f1de0d699fd72ac28a9f2e75218f6149692798f93be"
+  },
+  "id": "CZRTHaoHP01JehkI",
+  "tags": []
+}

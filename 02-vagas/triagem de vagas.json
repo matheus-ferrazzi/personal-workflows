@@ -1,0 +1,535 @@
+{
+  "name": "triagem de vagas",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://jsearch.p.rapidapi.com/search",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "Analista de Infraestrutura em São Paulo, SP"
+            },
+            {
+              "name": "country",
+              "value": "br"
+            },
+            {
+              "name": "language",
+              "value": "pt"
+            },
+            {
+              "name": "num_pages",
+              "value": "5"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-RapidAPI-Host",
+              "value": "jsearch.p.rapidapi.com"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -560,
+        -96
+      ],
+      "id": "e2678652-420b-45da-beb3-6b69fabc4897",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "FjcccniGrywS0DRo",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        -96
+      ],
+      "id": "63626a30-7ac4-4b24-99bc-b9809edb7a34",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO vagas_rastreadas (job_id, job_title, employer_name) \nVALUES ('{{ $json.job_id }}', '{{ $json.job_title }}', '{{ $json.employer_name }}') \nON CONFLICT (job_id) DO NOTHING\nRETURNING job_id;",
+        "options": {
+          "queryBatching": "independently"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        48,
+        -96
+      ],
+      "id": "f7ffeef5-f068-419f-96b8-58bd53f706db",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "sPi42D5UUdV5EmDP",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "caabe321-d26f-44aa-9a51-a3c2033c6418",
+              "leftValue": "={{ $json.job_id }}",
+              "rightValue": true,
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        224,
+        -96
+      ],
+      "id": "45ef6d4b-2217-4e54-b8a2-7dca84827093",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "model": "llama-3.3-70b-versatile",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        976,
+        -48
+      ],
+      "id": "ce065931-2946-4ac8-91cf-72f832a31dfc",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "DGpWgSCG9axECmYH",
+          "name": "Groq account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Atue como um Tech Recruiter Sênior. Sua missão é avaliar se a descrição desta vaga faz sentido para o perfil do candidato.\n\nPERFIL DO CANDIDATO:\n- Nome: xxxxxx\n- Cargo Alvo: Analista de Infraestrutura Pleno/Sênior ou Engenheiro de Monitoramento.\n- Cloud e Virtualização: VMware, Hyper-V, Google Cloud Platform (GCP) e Microsoft Azure.\n- Sistemas Operacionais: Windows Server e Linux.\n- Redes e Segurança: Ubiquiti UniFi, Sophos, PfSense, Huawei e Fortinet.\n- Monitoramento Avançado: Especialista em Zabbix (v5 a v7) e Grafana.\n- Backup e Identidade: Veeam Backup & Replication, Active Directory (AD), Google Workspace e M365.\n- Bancos de Dados: SQL Server, PostgreSQL, MySQL, Oracle.\n- Diferenciais: Cultura DevOps, esteiras CI/CD, automação (Shell/PowerShell) e suporte a sistemas críticos (ERP Tasy).\n- Foco: Soluções robustas de HA, escalabilidade, segurança e monitoramento proativo.\n\nDESCRIÇÃO DA VAGA:\n{{ $json.job_description }}\n\nTAREFA:\nAnalise a vaga acima. Retorne ESTRITAMENTE um objeto JSON válido (sem markdown, sem explicações extras) com a seguinte estrutura:\n{\n  \"score\": <numero de 0 a 100 indicando a aderência exata ao perfil do candidato>,\n  \"missing_skills\": [\"lista\", \"curta\", \"das ferramentas ou exigências que ele não possui\"],\n  \"summary\": \"<resumo da vaga em até 3 linhas focando no que importa para infra (stack, modelo, desafios)>\",\n  \"verdict\": \"<'APROVADA' se o score for maior ou igual a 70, caso contrário 'DESCARTADA'>\"\n}",
+        "batching": {
+          "batchSize": 1,
+          "delayBetweenBatches": 45000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        976,
+        -192
+      ],
+      "id": "06bf9187-7869-4afa-a4b1-d810f62acc67",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "dcde8f70-f3b8-4264-8cd7-746ac2e9fd50",
+              "leftValue": "={{ $json.text }}",
+              "rightValue": "APROVADA",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1296,
+        -192
+      ],
+      "id": "90c2e992-ab69-4f46-951d-cde1cca08415",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        720,
+        -208
+      ],
+      "id": "d50f9b64-0039-4fbc-8e71-69a51251f385",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "amount": 30
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1264,
+        48
+      ],
+      "id": "af1eed16-01be-47d7-8920-c3b7dbd91e21",
+      "name": "Wait",
+      "webhookId": "5c5d15c2-941d-44d6-943c-df5d30c23d99"
+    },
+    {
+      "parameters": {
+        "fromEmail": "xxxxxxxxxxxxxxxxxxxx",
+        "toEmail": "xxxxxxxxxxxxxxxxx",
+        "subject": "=Resumo de Vagas: {{ $json.total_vagas }} matches de Infra encontrados!",
+        "html": "={{ $json.corpo_final }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1296,
+        -368
+      ],
+      "id": "b048d1c7-1ae7-43d0-9577-5ca24ffa1f93",
+      "name": "Send an Email",
+      "webhookId": "7de15d0c-248d-456a-a2e5-e98e6fba1ff0",
+      "credentials": {
+        "smtp": {
+          "id": "49WSrq6uAFaOQCDi",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Puxando a memória global com o cifrão ($)\nconst staticData = $getWorkflowStaticData('global');\nconst vagas = staticData.vagasAprovadas || [];\n\n// Se o array estiver vazio, encerra o fluxo silenciosamente\nif (vagas.length === 0) {\n    return [];\n}\n\n// Junta todos os blocos em um e-mail só e limpa o buffer para a próxima execução\nconst corpoEmail = vagas.join('<br>');\nstaticData.vagasAprovadas = [];\n\nreturn [{json: { corpo_final: corpoEmail, total_vagas: vagas.length }}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        -368
+      ],
+      "id": "b3e00b1c-ec2c-4e60-ac0f-082b056aac16",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Puxamos a vaga completa da catraca\nconst vaga = $('Loop Over Items').first().json;\nconst textoCru = $('Basic LLM Chain').first().json.text;\n\n// 2. Sanitização da IA\nconst inicio = textoCru.indexOf('{');\nconst fim = textoCru.lastIndexOf('}');\nconst jsonLimpo = textoCru.substring(inicio, fim + 1);\nconst ia = JSON.parse(jsonLimpo);\n\n// 3. Tratamento Inteligente de Localidade (Pega cidade ou estado, e verifica se é remoto)\nconst cidadeOuEstado = vaga.job_city || vaga.job_state || 'Local não especificado';\nconst flagRemoto = vaga.job_is_remote ? ' 🟢 (100% Remoto)' : '';\nconst localFinal = `${cidadeOuEstado}${flagRemoto} / ${vaga.job_country || 'BR'}`;\n\n// 4. Montamos o bloco HTML\nconst blocoHtml = `\n    <h2 style=\"color: #0056b3;\">🚀 Match: ${vaga.job_title}</h2>\n    <p><strong>🏢 Empresa:</strong> ${vaga.employer_name || 'Confidencial'}</p>\n    <p><strong>📍 Local:</strong> ${localFinal}</p>\n    <p><strong>🎯 Score:</strong> <span style=\"color: green; font-weight: bold;\">${ia.score}%</span></p>\n    <p><strong>Resumo:</strong> ${ia.summary}</p>\n    <a href=\"${vaga.job_apply_link}\" style=\"display: inline-block; margin-top: 10px; padding: 10px 20px; background-color: #0056b3; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;\">Candidatar-se</a>\n    <hr style=\"border: 1px solid #eee; margin: 20px 0;\">\n`;\n\n// 5. Salva no Buffer Global\nconst staticData = $getWorkflowStaticData('global');\nstaticData.vagasAprovadas = staticData.vagasAprovadas || [];\nstaticData.vagasAprovadas.push(blocoHtml);\n\nreturn [{json: { status: \"Vaga salva no buffer com sucesso!\" }}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1488,
+        -208
+      ],
+      "id": "d9cd8402-76fd-499e-9862-ad6c18274102",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Puxa o backup de todas as vagas originais\nconst vagasOriginais = $('Split Out').all();\n\n// Restaura os dados completos apenas das vagas que passaram pelo banco\nreturn $input.all().map(item => {\n    const vagaCompleta = vagasOriginais.find(v => v.json.job_id === item.json.job_id);\n    return { json: vagaCompleta.json };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -208
+      ],
+      "id": "0ba64d48-4509-41e2-a8f1-2c557cdcd29d",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 6,
+              "triggerAtMinute": 1
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -928,
+        -96
+      ],
+      "id": "6aa375c0-124c-4722-aa14-3e89e0a3cd70",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "617da720-9369-456d-82b7-6acbb8f0f0f2",
+              "leftValue": "={{ $json.job_description }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        -176,
+        -96
+      ],
+      "id": "fb3766b3-4b31-41b9-aadc-ad9ac53c10bd",
+      "name": "Filter"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send an Email": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "9b84c5f0-a3ed-4cb5-821e-2e13fadbf257",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "83839adb748f869997470f1de0d699fd72ac28a9f2e75218f6149692798f93be"
+  },
+  "id": "9afxYgm2vXd16c9k",
+  "tags": []
+}

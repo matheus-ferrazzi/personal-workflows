@@ -1,0 +1,644 @@
+{
+  "name": "Controle financeiro",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Mensagem: {{ $('Telegram Trigger').first().json.message.text }}\nRemetente_Telegram: {{ $('Telegram Trigger').first().json.message.from.first_name }}",
+        "options": {
+          "systemMessage": "=Você é um assistente financeiro pessoal.\nData de hoje: {{ $now.format('dd/MM/yyyy') }}\n\nSUA MISSÃO:\nAnalise a 'Mensagem' e o 'Remetente_Telegram' para extrair os dados do gasto.\n\nREGRAS DE EXTRAÇÃO:\n1. VALOR: Extraia o número total bruto (ex: 50, 1900.90).\n2. CATEGORIA: Classifique em: Alimentação, Transporte, Lazer, Casa, Contas, Saúde, Outros, Ganhos.\n3. DESCRIÇÃO: Resuma o gasto.\n4. DATA: Calcule o 'dia', 'mes_num' e 'ano' corretos (ex: 2026).\n5. PAGAMENTO E PARCELAS: \n   - Identifique a 'forma_pagamento' (Crédito, Débito, Pix, Dinheiro).\n   - Se a compra for parcelada (ex: \"em 10x\", \"dividido em 5\"), extraia o número em 'parcelas'. Se for à vista, use 1.\n6. QUEM (Responsável) E COMPARTILHADO:\n   - Se a mensagem citar que duas pessoas gastaram (ex: \"maria e joão gastamos 55 cada\"), você DEVE OBRIGATORIAMENTE gerar uma LISTA com 2 objetos JSON separados.\n\nFORMATO DE SAÍDA (OBRIGATÓRIO JSON):\nRetorne APENAS um JSON:\n[\n  {\n    \"valor\": 0.00,\n    \"tipo\": \"Categoria\",\n    \"descricao\": \"Texto\",\n    \"dia\": 1,\n    \"mes_num\": \"1\",\n    \"ano\": 2026,\n    \"quem\": \"Matheus\",\n    \"forma_pagamento\": \"Crédito\",\n    \"parcelas\": 1\n  }\n]\n\nRETORNE ESTRITAMENTE O JSON, SEM NENHUM TEXTO ANTES OU DEPOIS"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        144,
+        -176
+      ],
+      "id": "826133a8-e08f-46b7-b03f-f8cb1d7daf78",
+      "name": "AI Agent",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "const conteudo = items[0].json.output || \"\";\nlet jsonString = \"\";\n\ntry {\n  // [TECHNICAL DEBT PAGO] Regex caça apenas o que está entre colchetes ou chaves\n  const match = conteudo.match(/(\\[[\\s\\S]*\\]|\\{[\\s\\S]*\\})/);\n  \n  if (!match) throw new Error(\"Nenhum padrão JSON encontrado.\");\n  jsonString = match[0];\n  \n  // SANITIZADOR SÊNIOR: Arranca zeros à esquerda de números (ex: \"dia\": 01 vira \"dia\": 1)\n  jsonString = jsonString.replace(/:\\s*0+(\\d+)/g, ': $1');\n  \n  let parsedData = JSON.parse(jsonString);\n  if (!Array.isArray(parsedData)) parsedData = [parsedData]; // Força ser matriz\n  let saidaFinal = [];\n\n  parsedData.forEach(item => {\n    let parcelas = item.parcelas || 1;\n    \n    // Se for à vista, joga direto pra saída\n    if (parcelas === 1) {\n      saidaFinal.push(item);\n    } \n    // Se for parcelado, inicia o motor de particionamento\n    else {\n      let valorParcela = (item.valor / parcelas).toFixed(2);\n      let mesBase = parseInt(item.mes_num);\n      let anoBase = parseInt(item.ano || new Date().getFullYear());\n\n      for (let i = 1; i <= parcelas; i++) {\n        let mesAtual = mesBase + i - 1;\n        let anoAtual = anoBase;\n        \n        // Se passar de dezembro, vira o ano e reseta o mês\n        if (mesAtual > 12) {\n          anoAtual += Math.floor((mesAtual - 1) / 12);\n          mesAtual = ((mesAtual - 1) % 12) + 1;\n        }\n\n        // Clona o objeto e sobrescreve com os dados da parcela atual\n        let novaParcela = { ...item };\n        novaParcela.valor = parseFloat(valorParcela);\n        novaParcela.descricao = `${item.descricao} (${i}/${parcelas})`;\n        novaParcela.mes_num = mesAtual.toString().padStart(2, '0');\n        novaParcela.ano = anoAtual;\n        \n        saidaFinal.push(novaParcela);\n      }\n    }\n  });\n\n  return saidaFinal.map(p => ({ json: p }));\n\n} catch (erro) {\n  // Se mesmo com o Regex der pau, cospe o erro no log\n  throw new Error(\"Falha crítica no Parser JSON. IA mandou: \" + conteudo);\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        -176
+      ],
+      "id": "3c05f32c-62ec-4cba-afa7-f2280c941c00",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "mode": "list",
+          "cachedResultName": "Txxxxx",
+          "cachedResultUrl": "xxxxxxxxxxxxxxxxx"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 850477726,
+          "mode": "list",
+          "cachedResultName": "xxxxxxxxxxxxxxxxxxxxxx",
+          "cachedResultUrl": "xxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Mês": "={{ $json.mes_num ? [\"\", \"JANEIRO\", \"FEVEREIRO\", \"MARÇO\", \"ABRIL\", \"MAIO\", \"JUNHO\", \"JULHO\", \"AGOSTO\", \"SETEMBRO\", \"OUTUBRO\", \"NOVEMBRO\", \"DEZEMBRO\"][parseInt($json.mes_num)] : \"MÊS NÃO IDENTIFICADO\" }}",
+            "Tipo": "={{ $json.tipo }}",
+            "Valor": "={{ $json.valor }}",
+            "Descrição": "={{ $json.descricao }}",
+            "Responsável.": "={{ $json.quem }}",
+            "Data": "={{ $json.dia }}/{{ $json.mes_num }}/{{ $json.ano }}",
+            "Forma_Pagamento": "={{ $json.forma_pagamento }}",
+            "Parcela": "={{ $json.parcelas }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Data",
+              "displayName": "Data",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Mês",
+              "displayName": "Mês",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Tipo",
+              "displayName": "Tipo",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Valor",
+              "displayName": "Valor",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Descrição",
+              "displayName": "Descrição",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Responsável.",
+              "displayName": "Responsável.",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Forma_Pagamento",
+              "displayName": "Forma_Pagamento",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Parcela",
+              "displayName": "Parcela",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        736,
+        -176
+      ],
+      "id": "44ce3128-051f-401b-bc5c-721e0411ebc3",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "QyYewb56rWdgdpNV",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $json.texto_notificacao }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1136,
+        -176
+      ],
+      "id": "e76d4ec0-3ad8-44fb-9271-b0a90cd48404",
+      "name": "Send a text message",
+      "webhookId": "618a5627-b7b2-4ca6-a1d3-656c0b197980",
+      "notesInFlow": true,
+      "credentials": {
+        "telegramApi": {
+          "id": "OjGmSM4i9zZjVsrh",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -896,
+        0
+      ],
+      "id": "bd21b36e-e24b-442e-aa7a-ad02a37dd320",
+      "name": "Telegram Trigger",
+      "webhookId": "4717866d-8007-48e3-87c0-aad55986dcf7",
+      "credentials": {
+        "telegramApi": {
+          "id": "usBjHf6IrECAnTzc",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8d800e0f-099a-44d6-9b55-dcd3de5e18f1",
+              "leftValue": "={{ $json.message.chat.id }}",
+              "rightValue": "xxxxxxxxxxxxxx",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -736,
+        0
+      ],
+      "id": "cbf283ba-d236-44c6-8b4c-4c8ae874795d",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "57563ee0-95a9-407f-a7e2-af3739e1b5e4",
+              "leftValue": "={{ $json.output }}",
+              "rightValue": "registro",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -144,
+        -16
+      ],
+      "id": "385c2ec4-bde7-44bf-a08a-d2e3bf37ef0e",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "documentId": {
+          "__rl": true,
+          "value": "xxxxxxxxxxxxxxxxxxxxxx",
+          "mode": "list",
+          "cachedResultName": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "cachedResultUrl": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 850477726,
+          "mode": "list",
+          "cachedResultName": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "cachedResultUrl": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        96,
+        192
+      ],
+      "id": "d3c01d33-4e3d-4a14-879c-bae6927ae3b9",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleApi": {
+          "id": "QyYewb56rWdgdpNV",
+          "name": "Google Service Account account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Pega em todas as linhas do Sheets e na resposta do Agente 1\nconst todosItens = $input.all();\nconst porteiroTexto = $('AI Agent1').first().json.output || \"{}\";\n\n// 2. Extrai os parâmetros dinâmicos da IA (Filtro Ligeiro)\nlet filtros = { data_inicio: \"2000-01-01\", data_fim: \"2100-12-31\" };\ntry {\n  const match = porteiroTexto.match(/\\{[\\s\\S]*\\}/);\n  if (match) filtros = Object.assign(filtros, JSON.parse(match[0]));\n} catch (e) {\n  // Fallback silencioso se a IA se engasgar\n}\n\n// 3. Conversor de Datas (DD/MM/YYYY do Sheets para YYYY-MM-DD)\nfunction formatarDataParaIso(dataStr) {\n  if (!dataStr || !dataStr.includes(\"/\")) return \"1970-01-01\";\n  const partes = dataStr.split(\"/\");\n  const dia = partes[0].padStart(2, '0');\n  const mes = partes[1].padStart(2, '0');\n  let ano = partes[2];\n  if (ano.length === 2) ano = \"20\" + ano; // Cobre anos tipo \"26\"\n  return `${ano}-${mes}-${dia}`;\n}\n\nconst dataInicioISO = filtros.data_inicio || \"2000-01-01\";\nconst dataFimISO = filtros.data_fim || \"2100-12-31\";\n\n// 4. Filtra o lixo E aplica o range de datas\nconst itensValidos = todosItens.filter(item => {\n  const d = item.json;\n  const dataOriginal = d[\"Data\"] || d[\"dia\"];\n  const valor = d[\"Valor\"] || d[\"valor\"];\n\n  // Se for linha fantasma (sem valor nem data), dropa já\n  if (!dataOriginal && !valor) return false;\n\n  // Compara a data da linha com o pedido do utilizador\n  const dataLinhaISO = formatarDataParaIso(dataOriginal);\n  return dataLinhaISO >= dataInicioISO && dataLinhaISO <= dataFimISO;\n});\n\n// 5. Trava de Segurança HA (Anti-Infarto da Groq)\n// Se pedires \"tudo desde 2010\", limitamos aos últimos 100 para não estourar tokens\nconst items = itensValidos.slice(-100);\n\n// 6. Formatador Clean\nconst linhas = items.map(item => {\n  const d = item.json;\n  const data = d[\"Data\"] || d[\"dia\"] || \"S/D\";\n  const valor = d[\"Valor\"] || d[\"valor\"] || d[\"col_8\"] || 0;\n  const desc = d[\"Descrição\"] || d[\"Descricao\"] || \"Sem descrição\";\n  \n  return `- [${data}] ${desc} | R$ ${valor}`;\n}).join(\"\\n\");\n\nreturn [{\n  json: {\n    relatorio_completo: linhas || \"Nenhum lançamento encontrado neste período temporal específico.\"\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        352,
+        192
+      ],
+      "id": "09e851d5-ea32-4ded-a79b-13b1b81483c9",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=PERGUNTA: {{ $('Telegram Trigger').first().json.message.text }}\n\nDADOS: {{ $('Code in JavaScript').first().json.relatorio_completo }}",
+        "options": {
+          "systemMessage": "=Você é um Analista Financeiro.\nResponda à \"PERGUNTA DO USUÁRIO\" usando apenas os \"DADOS FINANCEIROS\" fornecidos.\nSe perguntarem totais, some os valores.\nSeja direto."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        576,
+        192
+      ],
+      "id": "7e6c7d08-d117-4984-912f-5f0c030d6427",
+      "name": "AI Agent2",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        944,
+        192
+      ],
+      "id": "ae036f46-45ab-4aa4-9a5f-91f8831bdfda",
+      "name": "Send a text message1",
+      "webhookId": "92d432ec-659f-4c5e-8b0a-dfb86cf474ff",
+      "credentials": {
+        "telegramApi": {
+          "id": "OjGmSM4i9zZjVsrh",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Telegram Trigger').first().json.message.text }}",
+        "options": {
+          "systemMessage": "=Você é um classificador de intenções e extrator de datas.\nData de hoje: {{ $now.format('yyyy-MM-dd') }}\n\nAnalise a mensagem do usuário e retorne UM OBJETO JSON ESTRITO com as seguintes chaves:\n1. \"intencao\": \"registro\" ou \"consulta\"\n2. \"data_inicio\": \"YYYY-MM-DD\" (Se a intenção for consulta, calcule a data inicial pedida. Ex: \"este mês\" = dia 01 deste mês. \"últimos 3 dias\" = subtraia 3 dias de hoje. Se ele não pedir uma data específica, retorne por padrão o dia 01 do mês atual).\n3. \"data_fim\": \"YYYY-MM-DD\" (Padrão: data de hoje).\n\nREGRAS RÍGIDAS: \n- Retorne APENAS o JSON válido. \n- NÃO use formatação markdown (```json).\n\nRESPOSTA OBRIGATÓRIA:\n{ \"intencao\": \"registro\" } OU { \"intencao\": \"consulta\" }"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -480,
+        -16
+      ],
+      "id": "0a44bbba-a94f-4603-a1a0-e02d50dd30d3",
+      "name": "AI Agent1",
+      "retryOnFail": false,
+      "waitBetweenTries": 5000,
+      "maxTries": 2
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        160
+      ],
+      "id": "8ea53d25-f9b0-46f5-97af-a165256554de",
+      "name": "Groq Chat Model",
+      "credentials": {
+        "groqApi": {
+          "id": "NXvjA6OExOgZMV56",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        144,
+        0
+      ],
+      "id": "e31652e1-c2c8-42c0-b6a3-008f68023542",
+      "name": "Groq Chat Model1",
+      "credentials": {
+        "groqApi": {
+          "id": "NXvjA6OExOgZMV56",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama-3.1-8b-instant",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "typeVersion": 1,
+      "position": [
+        576,
+        384
+      ],
+      "id": "fd5e2c55-133a-496b-93d4-d0b1292a14f7",
+      "name": "Groq Chat Model2",
+      "credentials": {
+        "groqApi": {
+          "id": "NXvjA6OExOgZMV56",
+          "name": "Groq account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Puxa todos os itens que saíram do Google Sheets\nconst itens = $input.all();\nconst qtd = itens.length;\nconst base = itens[0].json;\n\n// Pega as chaves com os nomes exatos das colunas do Sheets\nconst descricao = base[\"Descrição\"] || \"Sem descrição\";\nconst valor = parseFloat(base[\"Valor\"]) || 0;\nconst tipo = base[\"Tipo\"] || \"Geral\";\nconst formaPagamento = base[\"Forma_Pagamento\"] || \"N/A\";\nconst quem = base[\"Responsável.\"] || base[\"Responsável\"] || \"N/A\";\n\nlet mensagem = \"\";\n\nif (qtd === 1) {\n  // Lançamento Único (Agora usando <b> para negrito)\n  mensagem = `✅ <b>Lançamento Confirmado!</b>\\n🛒 ${descricao}\\n💸 Valor: R$ ${valor.toFixed(2)}\\n🏷️ Categoria: ${tipo}\\n💳 Tipo: ${formaPagamento}\\n👤 Quem: ${quem}`;\n} else {\n  // Lançamento Múltiplo (Parcelado ou Dividido)\n  let descricaoLimpa = descricao.replace(/\\s\\(\\d+\\/\\d+\\)$/, \"\");\n  let valorTotal = itens.reduce((acc, item) => acc + (parseFloat(item.json[\"Valor\"]) || 0), 0);\n  \n  mensagem = `✅ <b>Lançamento Múltiplo Confirmado!</b>\\n🛒 Item: ${descricaoLimpa}\\n💸 Valor Total: R$ ${valorTotal.toFixed(2)}\\n🔢 Parcelas/Divisões: ${qtd}x de R$ ${valor.toFixed(2)}\\n💳 Tipo: ${formaPagamento}\\n👤 Quem: ${quem}`;\n}\n\n// Retorna o pacote pronto\nreturn [{\n  json: {\n    texto_notificacao: mensagem\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        928,
+        -176
+      ],
+      "id": "38c7be25-12d6-47ed-9dab-0485751d8627",
+      "name": "Code in JavaScript2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent2": {
+      "main": [
+        [
+          {
+            "node": "Send a text message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent1": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "d5538399-240a-4a22-b6cf-b9a2a1c60b5f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "83839adb748f869997470f1de0d699fd72ac28a9f2e75218f6149692798f93be"
+  },
+  "id": "MXtfDeKRPkrINLvG",
+  "tags": []
+}
