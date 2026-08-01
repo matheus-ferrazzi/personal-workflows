@@ -1,47 +1,57 @@
-# 💰 FinOps & Lifecycle Automation (n8n + AI + Sheets)
+# 💰 Finanças do Casal — Open Banking → Postgres → n8n → Dashboard
 
-> **Personal engineering-grade ecosystem for FinOps, Observability, and Disaster Recovery.**
+Ecossistema de automação financeira pessoal do casal (Matheus & Ariane). A geração atual abandona a planilha e a digitação manual: os dados vêm direto dos bancos via **Open Finance (Pluggy)**, são classificados e gravados no **Postgres**, e viram **relatórios no Telegram** + um **dashboard web**.
 
-This repository hosts a collection of advanced workflows designed to orchestrate personal financial operations. By leveraging **n8n** as the central nervous system, **Groq AI** for natural language processing, and **Google Sheets** as the data lake, this project automates expense tracking, systemizes health checks, and ensures high availability of financial data.
+> 📊 O dashboard (app Next.js) fica em repositório separado: **[matheus-ferrazzi/finance-dash](https://github.com/matheus-ferrazzi/finance-dash)**
 
-## 🧠 Workflows Breakdown
+## 🏗️ Arquitetura
 
-### 1. 🤖 AI-Driven Expense Tracker (Ingestion & Query)
-**File:** `Controle financeiro.json`
-An NLP-driven pipeline that replaces manual spreadsheet data entry with natural language processing via Telegram.
+```
+Pluggy (Open Finance)  ──►  n8n (ingestão + classificação)  ──►  Postgres
+                                                                    │
+                                    ┌───────────────────────────────┼───────────────┐
+                                    ▼                               ▼               ▼
+                              Bots Telegram                    Dashboard        (backups)
+```
 
-* **LLM Parsing:** Uses an AI Agent to extract structured data (Amount, Category, Date, Installments) from casual Telegram voice or text messages.
-* **Data Sanitization:** Applies Regex and JavaScript formatting to ensure data compliance before database insertion.
-* **Data Lake Integration:** Executes secure `append` operations directly into a Google Sheets database.
-* **Query Routing:** Recognizes intent to query balances and uses the LLM to summarize recent rows on demand.
+Cada lançamento recebe uma **`classe`** (`despesa` · `receita` · `aporte` · `transferencia_interna` · `pagamento_fatura` · `estorno`), o que garante números reais (transferências entre contas e pagamentos de fatura ficam fora dos totais). A categoria da Pluggy passa por uma **camada de correção** (ex.: PlayStation que a Pluggy marcava como "aposta", pagamento de fatura via boleto, RDB da caixinha, etc.).
 
-### 2. 💓 Financial Heartbeat (Observability)
-**File:** `Heart Check.json`
-A proactive observability routine to monitor financial health without requiring manual dashboard checks.
+## 🧩 Workflows
 
-* **Scheduled Cron:** Runs automatically 3x a week.
-* **Trend Analysis:** Queries recent rows from the database and uses an LLM to generate a summary of the weekly burn rate and spending habits.
-* **Alerting:** Delivers a consolidated health check report back to a secure Telegram chat.
+### Ingestão (Pluggy → Postgres)
+| Arquivo | O que faz |
+|---------|-----------|
+| `Finance 2.0.json` | Ingestão principal a cada 3h: autentica na Pluggy, busca transações (paginado), classifica (`classe` + correção de categoria) e faz upsert em `financas_lancamentos`. |
+| `Pluggy - Faturas Cartao de Credito.json` | Atualiza `financas_faturas` (fatura atual, limite, vencimento) por cartão. |
+| `Pluggy - Investimentos.json` | Atualiza `financas_investimentos` (posição da carteira, exclui resgatados). |
 
-### 3. 🚑 Disaster Recovery (Data Backup)
-**File:** `BKP da planiha.json`
-Ensures high availability and prevents data loss for the personal financial database.
+### Bots Telegram (relatórios)
+| Arquivo | O que faz |
+|---------|-----------|
+| `Bot 01 - Assistente Financeiro Interativo.json` | Assistente interativo (Telegram trigger) — *atualmente desativado*. |
+| `Bot 02 - Relatorio Semanal de Financas.json` | Relatório semanal do casal, com resumo por IA (Groq), tom sóbrio. |
+| `Bot 03 - Relatorio Diario 3x por Semana.json` | Check-in diário curto (gastos do dia vs. semana/mês). |
+| `Bot 04 - Atualizacao de Investimentos.json` | Panorama de investimentos do casal. |
+| `Bot 05 - Saude das Conexoes.json` | Observabilidade: alerta se alguma coleta (lançamentos/faturas/investimentos) atrasar. |
+| `Bot 06 - Orcamento por Categoria.json` | Lê a tabela `financas_orcamento` e alerta ao atingir 80% do teto de cada categoria. |
+| `Bot 07 - Relatorio do Casal.json` | Relatório consolidado do casal (despesa/receita por mês, top categorias, faturas, investido). |
 
-* **Automated Export:** Triggers monthly to securely authenticate via OAuth2 and download the current state of the Google Sheet as an `.xlsx` physical file.
-* **Secure Vault:** Sends the binary file directly to a private Telegram channel acting as an encrypted cold storage vault.
+## 🗄️ Tabelas (Postgres)
+
+`financas_lancamentos` · `financas_orcamento` · `financas_faturas` · `financas_investimentos` · `financas_patrimonio`
+
+## 🔐 Segurança
+
+- Credenciais (Pluggy, Postgres, Telegram, Groq) ficam **fora** dos workflows — referenciadas por env/credenciais do n8n, nunca hardcoded.
+- Os exports neste repositório foram **sanitizados** (chat IDs trocados por placeholder).
+- Dashboard exposto via Cloudflare Tunnel + **Cloudflare Access** (login por e-mail); banco lido por usuário **somente-leitura**.
+
+## 🧠 Stack
+
+n8n (self-hosted) · Pluggy (Open Finance) · PostgreSQL · Groq (Llama) para os relatórios · Telegram · Docker · Cloudflare Tunnel/Access
 
 ---
 
-## 🛠️ Tech Stack & Methods
+> 📁 A geração anterior (baseada em Google Sheets + digitação manual) está preservada em [`_legacy-planilha/`](./_legacy-planilha) para referência histórica.
 
-* **Orchestrator:** n8n (Self-hosted)
-* **Databases:** Google Sheets API (Data Lake)
-* **Integrations:** Telegram API, Google Drive API
-* **AI & LLMs:** Groq (Llama 3) for NLP and classification
-* **Scripting:** JavaScript (Regex, array manipulation, data normalization)
-* **Security:**
-    * Credential abstraction (No hardcoded passwords).
-    * OAuth2 / Service Account implementation.
-
----
-*Maintained by [Matheus Ferrazzi](https://github.com/matheus-ferrazzi)*
+*Mantido por [Matheus Ferrazzi](https://github.com/matheus-ferrazzi).*
