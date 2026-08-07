@@ -36,6 +36,13 @@ Cada lançamento recebe uma **`classe`** (`despesa` · `receita` · `aporte` · 
 | `Bot 06 - Orcamento por Categoria.json` | Lê a tabela `financas_orcamento` e alerta ao atingir 80% do teto de cada categoria. |
 | `Bot 07 - Relatorio do Casal.json` | Relatório consolidado do casal (despesa/receita por mês, top categorias, faturas, investido). |
 
+### Bots Telegram (alertas)
+| Arquivo | O que faz |
+|---------|-----------|
+| `Bot 08 - Alerta de Vencimento de Fatura.json` | Diário (9h): avisa quando uma fatura entra na janela de 0–3 dias do vencimento (alerta uma vez por ciclo). |
+| `Bot 09 - Alerta de Gasto Grande.json` | De hora em hora: alerta compras acima de R$ 500 assim que são ingeridas (dedup via `staticData`, sem repetir). |
+| `Bot 10 - Fechamento de Mes.json` | Dia 1º (9h): resumo do mês que fechou — receita, despesa (vs mês anterior), saldo, top categorias e maior gasto. |
+
 ## 🗄️ Tabelas (Postgres)
 
 `financas_lancamentos` · `financas_orcamento` · `financas_faturas` · `financas_investimentos` · `financas_patrimonio`
