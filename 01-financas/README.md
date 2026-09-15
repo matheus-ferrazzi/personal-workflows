@@ -24,6 +24,7 @@ Cada lançamento recebe uma **`classe`** (`despesa` · `receita` · `aporte` · 
 | `Finance 2.0.json` | Ingestão principal a cada 3h: autentica na Pluggy, busca transações (paginado), classifica (`classe` + correção de categoria) e faz upsert em `financas_lancamentos`. |
 | `Pluggy - Faturas Cartao de Credito.json` | Atualiza `financas_faturas` (fatura atual, limite, vencimento) por cartão. |
 | `Pluggy - Investimentos.json` | Atualiza `financas_investimentos` (posição da carteira, exclui resgatados). |
+| `Pluggy - Saldos das Contas.json` | A cada 3h (:30): lê o saldo real de cada conta corrente e faz upsert em `financas_saldos`. É o ponto de partida da projeção do dashboard. |
 
 ### Bots Telegram (relatórios)
 | Arquivo | O que faz |
@@ -45,7 +46,7 @@ Cada lançamento recebe uma **`classe`** (`despesa` · `receita` · `aporte` · 
 
 ## 🗄️ Tabelas (Postgres)
 
-`financas_lancamentos` · `financas_orcamento` · `financas_faturas` · `financas_investimentos` · `financas_patrimonio`
+`financas_lancamentos` · `financas_orcamento` · `financas_faturas` · `financas_investimentos` · `financas_patrimonio` · `financas_saldos` · `financas_compromissos`
 
 ## 🔐 Segurança
 
